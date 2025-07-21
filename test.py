@@ -86,7 +86,7 @@ def active_start_date(start_date):
 def handle_regular_if_active(event_to_check):
     start_date = event_to_check['dtstart'].dt
 
-    if active_start_date(start_date):
+    if active_start_date(start_date) and ('STATUS' in event_to_check and event_to_check['STATUS'] != 'CANCELLED'):
         regular_events_arr.append(event_to_check)
 
 
