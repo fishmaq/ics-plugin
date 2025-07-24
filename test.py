@@ -1,5 +1,6 @@
 import datetime
 import io
+import os
 import subprocess
 
 import icalendar
@@ -12,8 +13,6 @@ from dateutil.relativedelta import relativedelta
 utc = pytz.utc
 
 # target .ics file location
-# TODO: use parameter or env var for this instead
-TARGET_ICS_LOCATION = '/home/itsv.org.sv-services.at/martin.cerny@itsv.at/playground/ics-plugin/test.ics'
 regular_events_arr = []
 master_events_arr = []
 override_events_dict = {}
@@ -32,9 +31,8 @@ def sync_ics():
     subprocess.run(
         # TODO: explain why this reformat is needed
         # start file with BEGIN:VCALENDAR and end it with END:VCALENDAR, remove all other occurrences of it
-        "echo BEGIN:VCALENDAR > " + TARGET_ICS_LOCATION + "&& syncevolution --export - backend=evolution-calendar | "
-                                                          "sed '/^BEGIN:VCALENDAR/d' | sed '/^END:VCALENDAR/d' >> " +
-        TARGET_ICS_LOCATION + " && echo END:VCALENDAR >> " + TARGET_ICS_LOCATION,
+        "echo BEGIN:VCALENDAR > $ICS_PLUGIN_ICS_LOCATION && syncevolution --export - backend=evolution-calendar | "
+        "sed '/^BEGIN:VCALENDAR/d' | sed '/^END:VCALENDAR/d' >> $ICS_PLUGIN_ICS_LOCATION && echo END:VCALENDAR >> $ICS_PLUGIN_ICS_LOCATION",
         shell=True,
         executable="/bin/bash")
     print("sync done!")
@@ -67,27 +65,15 @@ def active_event(start_date, end_date):
             start_date = utc.localize(start_date)
             end_date = utc.localize(end_date)
         # check if event is in the current day
-        # start = 24 0900
-        # today = 24 0000
-        # end = 25 1000
-        # tomorrow = 25 0000
+        # TODO: add support for events, that are going from eg. 1.1.2025 23:00 until 2.1.2025 02:00
         active = start_date >= utc.localize(today) and end_date <= utc.localize(tomorrow)
     elif type(start_date) == datetime.date:
         # check if event is in the current day
-        print(start_date)
-        print(end_date)
-        #24<=24 and 28>=24
-        print((start_date <= datetime.date(today.year, today.month,
-                             today.day) and end_date
-               >= datetime.date(
-                    today.year, today.month,
-                    today.day)))
         active = (start_date <= datetime.date(today.year, today.month,
                                               today.day) and end_date
                   >= datetime.date(
                     today.year, today.month,
                     today.day))
-    print(active)
     return active
 
 
@@ -95,8 +81,6 @@ def handle_regular_if_active(event_to_check):
     start_date = event_to_check['dtstart'].dt
     end_date = event_to_check['dtend'].dt
 
-    if 'SUMMARY' in event_to_check:
-        print(event_to_check['summary'])
     if active_event(start_date, end_date) and ('STATUS' in event_to_check and event_to_check['STATUS'] != 'CANCELLED'):
         regular_events_arr.append(event_to_check)
 
@@ -133,7 +117,8 @@ def map_recurring_event(master_event, override_event_arr):
     exclude_date_arr = []
 
     # sort out irrelevant override events
-    override_event_arr = [event for event in override_event_arr if active_event(event['dtstart'].dt, event['dtend'].dt,)]
+    override_event_arr = [event for event in override_event_arr if
+                          active_event(event['dtstart'].dt, event['dtend'].dt, )]
     if 'EXDATE' in master_event:
         if type(master_event['exdate']) is list:
             for exclude_date_entry in master_event['exdate']:
@@ -197,6 +182,7 @@ def map_recurring_event(master_event, override_event_arr):
                         date = date + relativedelta(days=1)
                 i += 1
     else:
+        # TODO:
         print('date not supported yet')
 
     return out_dict_arr
@@ -255,9 +241,9 @@ def master_event_active(event_to_check):
 
 def main():
     sync_ics()
-
+    # TODO: add better comments
     # load ics file
-    with open(TARGET_ICS_LOCATION,
+    with open(os.environ['ICS_PLUGIN_ICS_LOCATION'],
               'r', encoding='utf-8') as file:
         cal = icalendar.Calendar.from_ical(file.read())
 
@@ -293,12 +279,11 @@ def main():
                     out_arr.append(generated_event)
 
         # sort out_arr
-        out_arr = sorted(out_arr,key=lambda value: int(value['start'][-5:].replace(':', '')))
+        out_arr = sorted(out_arr, key=lambda value: int(value['start'][-5:].replace(':', '')))
 
         # write events to output file
-        with io.open('events.txt', 'w', encoding='utf-8') as f:
+        with io.open(os.environ['ICS_PLUGIN_EVENTS_LOCATION'], 'w', encoding='utf-8') as f:
             for data in out_arr:
-                end = ''
                 # if the date is equal take only the time
                 if data['end'][:6] == data['start'][:6]:
                     end = data['end'][7:]
