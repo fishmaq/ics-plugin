@@ -1,10 +1,10 @@
 import datetime
-from dateutil.relativedelta import relativedelta
-import json
+import io
 import subprocess
 
 import icalendar
 import pytz
+from dateutil.relativedelta import relativedelta
 
 # this script is based on https://github.com/klemensschindler/icalfilter/blob/master/icalfilter.py (18.07.2025)
 # REQUIREMENTS: pip install pytz icalendar && sudo apt install syncevolution
@@ -20,16 +20,12 @@ override_events_dict = {}
 
 # get the date of this week's monday and sunday, to only display events that are happening this week
 today = datetime.datetime.today()
-first_day_of_curr_week = (
-        datetime.datetime(year=today.year, month=today.month, day=today.day, hour=0, minute=0, second=0) -
-        datetime.timedelta(days=datetime.datetime.now().isocalendar().weekday - 1))
-last_day_of_curr_week = (first_day_of_curr_week +
-                         datetime.timedelta(days=6))
-print(first_day_of_curr_week)
+today = datetime.datetime(year=today.year, month=today.month, day=today.day, hour=0, minute=0, second=0)
+tomorrow = (today +
+            datetime.timedelta(days=1))
 
 
 def sync_ics():
-    # TODO: add some sort of test !!!!
     print("syncing ICS file...")
 
     # TODO: improve readability
@@ -45,7 +41,8 @@ def sync_ics():
 
 
 def handle_if_recurring_event(event_to_check):
-    # TODO: explain the difference between master and override events
+    # master events are events, that are the source of a recurring event, hence they have the RRULE in them and no
+    # RECURRENCE-ID
     if 'RRULE' in event_to_check:
         # if there is a recurrence rule, this means, that it is the master event
         master_events_arr.append(event_to_check)
@@ -68,15 +65,15 @@ def active_start_date(start_date):
         if start_date.tzinfo is None or start_date.tzinfo.utcoffset(start_date) is None:
             start_date = utc.localize(start_date)
         # check if event is in the current week
-        active = utc.localize(first_day_of_curr_week) <= start_date <= utc.localize(
-            last_day_of_curr_week)
+        active = utc.localize(today) <= start_date <= utc.localize(
+            tomorrow)
     elif type(start_date) == datetime.date:
         # check if event is in the current week
-        active = (datetime.date(first_day_of_curr_week.year, first_day_of_curr_week.month,
-                                first_day_of_curr_week.day) <= start_date
+        active = (datetime.date(today.year, today.month,
+                                today.day) <= start_date
                   <= datetime.date(
-                    last_day_of_curr_week.year, last_day_of_curr_week.month,
-                    last_day_of_curr_week.day))
+                    tomorrow.year, tomorrow.month,
+                    tomorrow.day))
     else:
         print('')
 
@@ -99,21 +96,19 @@ def map_event(event):
         out_dict['title'] = '(no title)'
 
     out_dict['status'] = event['status']
-    out_dict['start'] = event['DTSTART'].dt.strftime('%d.%m.%Y %H:%M')
+    out_dict['start'] = event['DTSTART'].dt.strftime('%d.%m. %H:%M')
 
     if event['dtend'] is not None:
-        out_dict['end'] = event['DTEND'].dt.strftime('%d.%m.%Y %H:%M')
+        if type(event['DTEND'].dt) == datetime.date:
+            out_dict['end'] = (event['DTEND'].dt - datetime.timedelta(days=1)).strftime('%d.%m. %H:%M')
+        else:
+            out_dict['end'] = event['DTEND'].dt.strftime('%d.%m. %H:%M')
 
     if 'RRULE' in event:
         rrule = event['RRULE']
         if 'UNTIL' in rrule and len(rrule['UNTIL']) == 1:
-            out_dict['until'] = rrule['UNTIL'][0].strftime('%d.%m.%Y %H:%M')
+            out_dict['until'] = rrule['UNTIL'][0].strftime('%d.%m. %H:%M')
             out_dict['freq'] = rrule['FREQ'][0]
-
-    # TODO: comment in and add more data if needed (organizer? location?)
-    # if item['description'] is not None:
-    #     data['description'] = item['description']
-    # data['attendee'] = item['attendee']
 
     return out_dict
 
@@ -136,7 +131,7 @@ def map_recurring_event(master_event, override_event_arr):
 
     if type(master_event['dtstart'].dt) == datetime.datetime:
         max_date = utc.localize(
-            last_day_of_curr_week)
+            tomorrow)
         master_event_start = master_event['dtstart'].dt
         master_event_end = master_event['dtend'].dt
         date = master_event_start
@@ -188,7 +183,6 @@ def map_recurring_event(master_event, override_event_arr):
                         date = date + relativedelta(days=1)
                 i += 1
     else:
-        # TODO:
         print('date not supported yet')
 
     return out_dict_arr
@@ -226,27 +220,26 @@ def master_event_active(event_to_check):
     # check if master event already started
     if type(start_date) == datetime.datetime:
         active = start_date <= utc.localize(
-            first_day_of_curr_week)
+            today)
     elif type(start_date) == datetime.date:
         active = start_date <= datetime.date(
-            first_day_of_curr_week.year, first_day_of_curr_week.month,
-            first_day_of_curr_week.day)
+            today.year, today.month,
+            today.day)
 
     # check if master event hasn't already ended
     if until_date is not None:
         if type(until_date) == datetime.datetime:
-            active = active and until_date >= utc.localize(first_day_of_curr_week)
+            active = active and until_date >= utc.localize(today)
         elif type(until_date) == datetime.date:
             # FIXME: weird intellij warning that i dont understand
             active = active and until_date >= datetime.date(
-                first_day_of_curr_week.year, first_day_of_curr_week.month,
-                first_day_of_curr_week.day)
+                today.year, today.month,
+                today.day)
 
     return active
 
 
 def main():
-    # TODO: comment back in
     sync_ics()
 
     # load ics file
@@ -265,30 +258,49 @@ def main():
 
         # put all regular events into out arr as they are already filtered
         for event in regular_events_arr:
-            json_dict_regular = map_event(event)
-            out_arr.append(json_dict_regular)
+            dict_regular = map_event(event)
+            out_arr.append(dict_regular)
 
             # filter out all master events, that aren't in this week
 
         for master_event in [master_event for master_event in master_events_arr if master_event_active(master_event)]:
-            # TODO: add exceptiondate support (exdate)
             # if there are any override events for the master event, handle them too
             if master_event['UID'] in override_events_dict:
-                json_arr_master = map_recurring_event(master_event, override_events_dict[master_event['UID']])
+                arr_master = map_recurring_event(master_event, override_events_dict[master_event['UID']])
             else:
                 # no override elements, means empty arr as parameter
-                json_arr_master = map_recurring_event(master_event, [])
+                arr_master = map_recurring_event(master_event, [])
 
-            for generated_event in json_arr_master:
+            for generated_event in arr_master:
                 if active_start_date(generated_event['start']):
-                    generated_event['start'] = generated_event['start'].strftime('%d.%m.%Y %H:%M')
-                    generated_event['end'] = generated_event['end'].strftime('%d.%m.%Y %H:%M')
+                    generated_event['title'] = generated_event['title']
+                    generated_event['start'] = generated_event['start'].strftime('%d.%m. %H:%M')
+                    generated_event['end'] = generated_event['end'].strftime('%d.%m. %H:%M')
                     out_arr.append(generated_event)
 
-        # print events to console
-        print(json.dumps(out_arr))
+        # write events to output file
+        with io.open('events.txt', 'w', encoding='utf-8') as f:
+            for data in out_arr:
+                end = ''
+                # if the date is equal take only the time
+                if data['end'][:6] == data['start'][:6]:
+                    end = data['end'][7:]
+                else:
+                    end = data['end']
 
-        print(len(out_arr))
+                # if the time is 00:00 remove it, since this event is a whole day event
+                if end[-5:] == '00:00':
+                    end = end[:-6]
+
+                start = data['start']
+                # if the time is 00:00 remove it, since this event is a whole day event
+                if start[-5:] == '00:00':
+                    start = start[:-6]
+                date_and_time = start + (' - ' if len(end) > 0 else '') + end
+                formatted_str = date_and_time + ': ' + data['title'] + '\n'
+
+                f.write(formatted_str)
+            f.write('reload')
 
 
 main()
