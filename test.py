@@ -18,7 +18,7 @@ regular_events_arr = []
 master_events_arr = []
 override_events_dict = {}
 
-# get the date of this week's monday and sunday, to only display events that are happening this week
+# get the date of today and tomorrow
 today = datetime.datetime.today()
 today = datetime.datetime(year=today.year, month=today.month, day=today.day, hour=0, minute=0, second=0)
 tomorrow = (today +
@@ -57,18 +57,19 @@ def handle_if_recurring_event(event_to_check):
         return False
 
 
-# check if the start date is relevant in this week
+# check if the start date is relevant in this day
+# TODO: returns an event, that has start type datetime.date and starts tomorrow
 def active_start_date(start_date):
     active = False
 
     if type(start_date) == datetime.datetime:
         if start_date.tzinfo is None or start_date.tzinfo.utcoffset(start_date) is None:
             start_date = utc.localize(start_date)
-        # check if event is in the current week
+        # check if event is in the current day
         active = utc.localize(today) <= start_date <= utc.localize(
             tomorrow)
     elif type(start_date) == datetime.date:
-        # check if event is in the current week
+        # check if event is in the current day
         active = (datetime.date(today.year, today.month,
                                 today.day) <= start_date
                   <= datetime.date(
@@ -261,7 +262,7 @@ def main():
             dict_regular = map_event(event)
             out_arr.append(dict_regular)
 
-            # filter out all master events, that aren't in this week
+            # filter out all master events, that aren't in this day
 
         for master_event in [master_event for master_event in master_events_arr if master_event_active(master_event)]:
             # if there are any override events for the master event, handle them too
