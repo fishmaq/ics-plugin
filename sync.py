@@ -25,8 +25,6 @@ tomorrow = (today +
 
 
 def sync_ics():
-    print("syncing ICS file...")
-
     # TODO: improve readability
     subprocess.run(
         # TODO: explain why this reformat is needed
@@ -35,7 +33,6 @@ def sync_ics():
         "sed '/^BEGIN:VCALENDAR/d' | sed '/^END:VCALENDAR/d' >> $ICS_PLUGIN_ICS_LOCATION && echo END:VCALENDAR >> $ICS_PLUGIN_ICS_LOCATION",
         shell=True,
         executable="/bin/bash")
-    print("sync done!")
 
 
 def handle_if_recurring_event(event_to_check):
@@ -240,6 +237,7 @@ def master_event_active(event_to_check):
 
 
 def main():
+    subprocess.run("notify-send ICS-Plugin Started syncing calendar...", shell=True, executable="/bin/bash")
     sync_ics()
     # TODO: add better comments
     # load ics file
@@ -303,6 +301,7 @@ def main():
 
                 f.write(formatted_str)
             f.write('reload')
+    subprocess.run("notify-send ICS-Plugin Syncing calendar done!", shell=True, executable="/bin/bash")
 
 
 main()
