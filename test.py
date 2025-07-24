@@ -58,31 +58,46 @@ def handle_if_recurring_event(event_to_check):
 
 
 # check if the start date is relevant in this day
-# TODO: returns an event, that has start type datetime.date and starts tomorrow
-def active_start_date(start_date):
+def active_event(start_date, end_date):
     active = False
 
+    # todo comment this function
     if type(start_date) == datetime.datetime:
         if start_date.tzinfo is None or start_date.tzinfo.utcoffset(start_date) is None:
             start_date = utc.localize(start_date)
+            end_date = utc.localize(end_date)
         # check if event is in the current day
-        active = utc.localize(today) <= start_date <= utc.localize(
-            tomorrow)
+        # start = 24 0900
+        # today = 24 0000
+        # end = 25 1000
+        # tomorrow = 25 0000
+        active = start_date >= utc.localize(today) and end_date <= utc.localize(tomorrow)
     elif type(start_date) == datetime.date:
         # check if event is in the current day
-        active = (datetime.date(today.year, today.month,
-                                today.day) <= start_date
-                  < datetime.date(
-                    tomorrow.year, tomorrow.month,
-                    tomorrow.day))
-
+        print(start_date)
+        print(end_date)
+        #24<=24 and 28>=24
+        print((start_date <= datetime.date(today.year, today.month,
+                             today.day) and end_date
+               >= datetime.date(
+                    today.year, today.month,
+                    today.day)))
+        active = (start_date <= datetime.date(today.year, today.month,
+                                              today.day) and end_date
+                  >= datetime.date(
+                    today.year, today.month,
+                    today.day))
+    print(active)
     return active
 
 
 def handle_regular_if_active(event_to_check):
     start_date = event_to_check['dtstart'].dt
+    end_date = event_to_check['dtend'].dt
 
-    if active_start_date(start_date) and ('STATUS' in event_to_check and event_to_check['STATUS'] != 'CANCELLED'):
+    if 'SUMMARY' in event_to_check:
+        print(event_to_check['summary'])
+    if active_event(start_date, end_date) and ('STATUS' in event_to_check and event_to_check['STATUS'] != 'CANCELLED'):
         regular_events_arr.append(event_to_check)
 
 
@@ -118,7 +133,7 @@ def map_recurring_event(master_event, override_event_arr):
     exclude_date_arr = []
 
     # sort out irrelevant override events
-    override_event_arr = [event for event in override_event_arr if active_start_date(event['dtstart'].dt)]
+    override_event_arr = [event for event in override_event_arr if active_event(event['dtstart'].dt, event['dtend'].dt,)]
     if 'EXDATE' in master_event:
         if type(master_event['exdate']) is list:
             for exclude_date_entry in master_event['exdate']:
@@ -271,14 +286,14 @@ def main():
                 arr_master = map_recurring_event(master_event, [])
 
             for generated_event in arr_master:
-                if active_start_date(generated_event['start']):
+                if active_event(generated_event['start'], generated_event['end']):
                     generated_event['title'] = generated_event['title']
                     generated_event['start'] = generated_event['start'].strftime('%d.%m. %H:%M')
                     generated_event['end'] = generated_event['end'].strftime('%d.%m. %H:%M')
                     out_arr.append(generated_event)
 
         # sort out_arr
-        out_arr = sorted(out_arr, key=lambda value: int(value['start'][-5:].replace(':', '')))
+        out_arr = sorted(out_arr,key=lambda value: int(value['start'][-5:].replace(':', '')))
 
         # write events to output file
         with io.open('events.txt', 'w', encoding='utf-8') as f:
