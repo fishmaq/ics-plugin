@@ -72,11 +72,9 @@ def active_start_date(start_date):
         # check if event is in the current day
         active = (datetime.date(today.year, today.month,
                                 today.day) <= start_date
-                  <= datetime.date(
+                  < datetime.date(
                     tomorrow.year, tomorrow.month,
                     tomorrow.day))
-    else:
-        print('')
 
     return active
 
@@ -278,6 +276,9 @@ def main():
                     generated_event['start'] = generated_event['start'].strftime('%d.%m. %H:%M')
                     generated_event['end'] = generated_event['end'].strftime('%d.%m. %H:%M')
                     out_arr.append(generated_event)
+
+        # sort out_arr
+        out_arr = sorted(out_arr, key=lambda value: int(value['start'][-5:].replace(':', '')))
 
         # write events to output file
         with io.open('events.txt', 'w', encoding='utf-8') as f:
