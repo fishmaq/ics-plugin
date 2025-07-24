@@ -237,7 +237,7 @@ def master_event_active(event_to_check):
 
 
 def main():
-    subprocess.run("notify-send ICS-Plugin Started syncing calendar...", shell=True, executable="/bin/bash")
+    subprocess.Popen("notify-send ICS-Plugin 'Started syncing calendar...'", shell=True, executable="/bin/bash")
     sync_ics()
     # TODO: add better comments
     # load ics file
@@ -301,7 +301,7 @@ def main():
 
                 f.write(formatted_str)
             f.write('reload')
-    subprocess.run("notify-send ICS-Plugin Syncing calendar done!", shell=True, executable="/bin/bash")
+    subprocess.Popen("notify-send ICS-Plugin 'Syncing calendar done!'", shell=True, executable="/bin/bash")
 
 
 main()
