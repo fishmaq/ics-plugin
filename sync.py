@@ -259,7 +259,12 @@ def main():
             dict_regular = map_event(event)
             out_arr.append(dict_regular)
 
-            # filter out all master events, that aren't in this day
+        # sort day whole events
+        out_arr = sorted(out_arr,
+                         key=lambda value:
+                         int(value['start'].replace(':', '').replace('.', '').replace(' ', ''))
+                         )
+        # filter out all master events, that aren't in this day
 
         for master_event in [master_event for master_event in master_events_arr if master_event_active(master_event)]:
             # if there are any override events for the master event, handle them too
@@ -270,6 +275,7 @@ def main():
                 arr_master = map_recurring_event(master_event, [])
 
             for generated_event in arr_master:
+                # print(value['start'].replace(':', '').replace('.', '').replace(' ', ''))
                 if active_event(generated_event['start'], generated_event['end']):
                     generated_event['title'] = generated_event['title']
                     generated_event['start'] = generated_event['start'].strftime('%d.%m. %H:%M')
