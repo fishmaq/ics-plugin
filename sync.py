@@ -25,12 +25,20 @@ tomorrow = (today +
 
 
 def sync_ics():
-    # TODO: improve readability
+    # the syncevolution --export command puts out all calendars from all email accounts, but the icalendar package can't
+    # handle multiple calendars, which is why the BEGIN and END for VCALENDAR are being removed and then added to the
+    # start and end of the file to reformat multiple calendars into one
     subprocess.run(
-        # TODO: explain why this reformat is needed
-        # start file with BEGIN:VCALENDAR and end it with END:VCALENDAR, remove all other occurrences of it
-        "echo BEGIN:VCALENDAR > $ICS_PLUGIN_ICS_LOCATION && syncevolution --export - backend=evolution-calendar | "
-        "sed '/^BEGIN:VCALENDAR/d' | sed '/^END:VCALENDAR/d' >> $ICS_PLUGIN_ICS_LOCATION && echo END:VCALENDAR >> $ICS_PLUGIN_ICS_LOCATION",
+        # start file with BEGIN:VCALENDAR
+        "echo BEGIN:VCALENDAR > $ICS_PLUGIN_ICS_LOCATION && " +
+        # print out evolution-calendar data
+        "syncevolution --export - backend=evolution-calendar | " +
+        # remove all occurences of "BEGIN:VCALENDAR" and "END:VCALENDAR" from the output of syncevolution
+        "sed '/^BEGIN:VCALENDAR/d' | sed '/^END:VCALENDAR/d' " +
+        # put the output into output file
+        ">> $ICS_PLUGIN_ICS_LOCATION && " +
+        # end it with END:VCALENDAR
+        "echo END:VCALENDAR >> $ICS_PLUGIN_ICS_LOCATION",
         shell=True,
         executable="/bin/bash")
 
