@@ -8,11 +8,11 @@ import pytz
 from dateutil.relativedelta import relativedelta
 
 # this script is based on https://github.com/klemensschindler/icalfilter/blob/master/icalfilter.py (18.07.2025)
-# REQUIREMENTS: pip install pytz icalendar && sudo apt install syncevolution
+# REQUIREMENTS: pip install pytz icalendar && sudo apt install syncevolution and env ICS_PLUGIN_EVENTS_LOCATION as well
+# as ICS_PLUGIN_ICS_LOCATION
 
 utc = pytz.utc
 
-# target .ics file location
 regular_events_arr = []
 master_events_arr = []
 override_events_dict = {}
@@ -20,8 +20,7 @@ override_events_dict = {}
 # get the date of today and tomorrow
 today = datetime.datetime.today()
 today = datetime.datetime(year=today.year, month=today.month, day=today.day, hour=0, minute=0, second=0)
-tomorrow = (today +
-            datetime.timedelta(days=1))
+tomorrow = (today + datetime.timedelta(days=1))
 
 
 def sync_ics():
@@ -64,7 +63,7 @@ def handle_if_recurring_event(event_to_check):
 def active_event(start_date, end_date):
     active = False
 
-    # todo comment this function
+    # TODO: comment this function
     if type(start_date) == datetime.datetime:
         if start_date.tzinfo is None or start_date.tzinfo.utcoffset(start_date) is None:
             start_date = utc.localize(start_date)
@@ -315,6 +314,7 @@ def main():
 
                 f.write(formatted_str)
             f.write('reload')
+
     subprocess.Popen("notify-send ICS-Plugin 'Syncing calendar done!'", shell=True, executable="/bin/bash")
 
 
